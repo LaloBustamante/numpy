@@ -96,11 +96,13 @@ _npy_alloc_cache(npy_uintp nelem, npy_uintp esz, npy_uint msz,
     assert((esz == 1 && cache == datacache) ||
            (esz == sizeof(npy_intp) && cache == dimcache));
     assert(PyGILState_Check());
+#ifndef Py_GIL_DISABLED
     if (nelem < msz) {
         if (cache[nelem].available > 0) {
             return cache[nelem].ptrs[--(cache[nelem].available)];
         }
     }
+#endif
     p = alloc(nelem * esz);
     if (p) {
 #ifdef _PyPyGC_AddMemoryPressure
@@ -131,12 +133,14 @@ _npy_free_cache(void * p, npy_uintp nelem, npy_uint msz,
                 cache_bucket * cache, void (*dealloc)(void *))
 {
     assert(PyGILState_Check());
+#ifndef Py_GIL_DISABLED
     if (p != NULL && nelem < msz) {
         if (cache[nelem].available < NCACHE) {
             cache[nelem].ptrs[cache[nelem].available++] = p;
             return;
         }
     }
+#endif
     dealloc(p);
 }
 
@@ -350,7 +354,8 @@ NPY_NO_EXPORT void *
 PyDataMem_UserNEW(size_t size, PyObject *mem_handler)
 {
     void *result;
-    PyDataMem_Handler *handler = (PyDataMem_Handler *) PyCapsule_GetPointer(mem_handler, "mem_handler");
+    PyDataMem_Handler *handler = (PyDataMem_Handler *) PyCapsule_GetPointer(
+            mem_handler, MEM_HANDLER_CAPSULE_NAME);
     if (handler == NULL) {
         return NULL;
     }
@@ -364,7 +369,8 @@ NPY_NO_EXPORT void *
 PyDataMem_UserNEW_ZEROED(size_t nmemb, size_t size, PyObject *mem_handler)
 {
     void *result;
-    PyDataMem_Handler *handler = (PyDataMem_Handler *) PyCapsule_GetPointer(mem_handler, "mem_handler");
+    PyDataMem_Handler *handler = (PyDataMem_Handler *) PyCapsule_GetPointer(
+            mem_handler, MEM_HANDLER_CAPSULE_NAME);
     if (handler == NULL) {
         return NULL;
     }
@@ -377,7 +383,8 @@ PyDataMem_UserNEW_ZEROED(size_t nmemb, size_t size, PyObject *mem_handler)
 NPY_NO_EXPORT void
 PyDataMem_UserFREE(void *ptr, size_t size, PyObject *mem_handler)
 {
-    PyDataMem_Handler *handler = (PyDataMem_Handler *) PyCapsule_GetPointer(mem_handler, "mem_handler");
+    PyDataMem_Handler *handler = (PyDataMem_Handler *) PyCapsule_GetPointer(
+            mem_handler, MEM_HANDLER_CAPSULE_NAME);
     if (handler == NULL) {
         WARN_NO_RETURN(PyExc_RuntimeWarning,
                      "Could not get pointer to 'mem_handler' from PyCapsule");
@@ -391,7 +398,8 @@ NPY_NO_EXPORT void *
 PyDataMem_UserRENEW(void *ptr, size_t size, PyObject *mem_handler)
 {
     void *result;
-    PyDataMem_Handler *handler = (PyDataMem_Handler *) PyCapsule_GetPointer(mem_handler, "mem_handler");
+    PyDataMem_Handler *handler = (PyDataMem_Handler *) PyCapsule_GetPointer(
+            mem_handler, MEM_HANDLER_CAPSULE_NAME);
     if (handler == NULL) {
         return NULL;
     }
@@ -422,6 +430,10 @@ PyDataMem_SetHandler(PyObject *handler)
     }
     if (handler == NULL) {
         handler = PyDataMem_DefaultHandler;
+    }
+    if (!PyCapsule_IsValid(handler, MEM_HANDLER_CAPSULE_NAME)) {
+        PyErr_SetString(PyExc_ValueError, "Capsule must be named 'mem_handler'");
+        return NULL;
     }
     token = PyContextVar_Set(current_handler, handler);
     if (token == NULL) {
@@ -473,7 +485,8 @@ get_handler_name(PyObject *NPY_UNUSED(self), PyObject *args)
             return NULL;
         }
     }
-    handler = (PyDataMem_Handler *) PyCapsule_GetPointer(mem_handler, "mem_handler");
+    handler = (PyDataMem_Handler *) PyCapsule_GetPointer(
+            mem_handler, MEM_HANDLER_CAPSULE_NAME);
     if (handler == NULL) {
         Py_DECREF(mem_handler);
         return NULL;
@@ -510,7 +523,8 @@ get_handler_version(PyObject *NPY_UNUSED(self), PyObject *args)
             return NULL;
         }
     }
-    handler = (PyDataMem_Handler *) PyCapsule_GetPointer(mem_handler, "mem_handler");
+    handler = (PyDataMem_Handler *) PyCapsule_GetPointer(
+            mem_handler, MEM_HANDLER_CAPSULE_NAME);
     if (handler == NULL) {
         Py_DECREF(mem_handler);
         return NULL;

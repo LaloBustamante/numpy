@@ -26,6 +26,7 @@
 
 #include "numpy/ndarraytypes.h"
 
+#include "npy_pycompat.h"
 #include "common.h"
 #include "array_method.h"
 #include "legacy_array_method.h"
@@ -95,6 +96,7 @@ wrapping_auxdata_free(wrapping_auxdata *wrapping_auxdata)
 
     if (wrapping_auxdata_freenum < WRAPPING_AUXDATA_FREELIST_SIZE) {
         wrapping_auxdata_freelist[wrapping_auxdata_freenum] = wrapping_auxdata;
+        wrapping_auxdata_freenum++;
     }
     else {
         PyMem_Free(wrapping_auxdata);
@@ -250,8 +252,9 @@ PyUFunc_AddWrappingLoop(PyObject *ufunc_obj,
     PyObject *loops = ufunc->_loops;
     Py_ssize_t length = PyList_Size(loops);
     for (Py_ssize_t i = 0; i < length; i++) {
-        PyObject *item = PyList_GetItem(loops, i);
+        PyObject *item = PyList_GetItemRef(loops, i);
         PyObject *cur_DType_tuple = PyTuple_GetItem(item, 0);
+        Py_DECREF(item);
         int cmp = PyObject_RichCompareBool(cur_DType_tuple, wrapped_dt_tuple, Py_EQ);
         if (cmp < 0) {
             goto finish;
